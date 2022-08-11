@@ -434,8 +434,12 @@ func (a *agent) handleSSHSession(session ssh.Session) (retErr error) {
 
 	sshPty, windowSize, isPty := session.Pty()
 	if isPty {
+		// Disable minimal PTY emulation set by gliderlabs/ssh (NL-to-CRNL).
+		// See https://github.com/coder/coder/issues/3371.
+		session.DisablePTYEmulation()
+
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", sshPty.Term))
-		ptty, process, err := pty.Start(cmd)
+		ptty, process, err := pty.Start(&sshPty, cmd)
 		if err != nil {
 			return xerrors.Errorf("start command: %w", err)
 		}
@@ -449,10 +453,6 @@ func (a *agent) handleSSHSession(session ssh.Session) (retErr error) {
 				}
 			}
 		}()
-		err = ptty.Resize(uint16(sshPty.Window.Height), uint16(sshPty.Window.Width))
-		if err != nil {
-			return xerrors.Errorf("resize ptty: %w", err)
-		}
 		go func() {
 			for win := range windowSize {
 				resizeErr := ptty.Resize(uint16(win.Height), uint16(win.Width))
@@ -542,7 +542,7 @@ func (a *agent) handleReconnectingPTY(ctx context.Context, rawID string, conn ne
 		}
 		cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
-		ptty, process, err := pty.Start(cmd)
+		ptty, process, err := pty.Start(nil, cmd)
 		if err != nil {
 			a.logger.Warn(ctx, "start reconnecting pty command", slog.F("id", id))
 		}

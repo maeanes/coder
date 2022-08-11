@@ -10,13 +10,14 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
+	"github.com/gliderlabs/ssh"
 	"golang.org/x/sys/windows"
 	"golang.org/x/xerrors"
 )
 
 // Allocates a PTY and starts the specified command attached to it.
 // See: https://docs.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session#creating-the-hosted-process
-func startPty(cmd *exec.Cmd) (PTY, Process, error) {
+func startPty(ptyReq *ssh.Pty, cmd *exec.Cmd) (PTY, Process, error) {
 	fullPath, err := exec.LookPath(cmd.Path)
 	if err != nil {
 		return nil, nil, err

@@ -38,6 +38,10 @@ replace github.com/fatedier/kcp-go => github.com/coder/kcp-go v2.0.4-0.202204091
 
 replace golang.zx2c4.com/wireguard/tun/netstack => github.com/coder/wireguard-go/tun/netstack v0.0.0-20220614153727-d82b4ba8619f
 
+// Switch to our fork that imports fixes from http://github.com/tailscale/ssh.
+// https://github.com/coder/coder/issues/3371
+replace github.com/gliderlabs/ssh => github.com/coder/ssh v0.0.0-20220811105153-fcea99919338
+
 require (
 	cdr.dev/slog v1.4.2-0.20220525200111-18dce5c2cd5f
 	cloud.google.com/go/compute v1.7.0
@@ -61,7 +65,7 @@ require (
 	github.com/fergusstrange/embedded-postgres v1.16.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20220402123239-6a3042f4b71a
-	github.com/gliderlabs/ssh v0.3.4
+	github.com/gliderlabs/ssh v0.3.3
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/httprate v0.6.0
 	github.com/go-chi/render v1.0.1
@@ -106,6 +110,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	github.com/tabbed/pqtype v0.1.1
+	github.com/u-root/u-root v0.8.0
 	github.com/unrolled/secure v1.12.0
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.8.0

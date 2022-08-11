@@ -33,7 +33,7 @@ func New(t *testing.T) *PTY {
 func Start(t *testing.T, cmd *exec.Cmd) (*PTY, pty.Process) {
 	t.Helper()
 
-	ptty, ps, err := pty.Start(cmd)
+	ptty, ps, err := pty.Start(nil, cmd)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = ps.Kill()
