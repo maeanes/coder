@@ -321,6 +321,8 @@ func (a *agent) init(ctx context.Context) {
 		},
 		SubsystemHandlers: map[string]ssh.SubsystemHandler{
 			"sftp": func(session ssh.Session) {
+				session.DisablePTYEmulation()
+
 				server, err := sftp.NewServer(session)
 				if err != nil {
 					a.logger.Debug(session.Context(), "initialize sftp server", slog.Error(err))
