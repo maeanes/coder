@@ -480,3 +480,14 @@ func (c *Client) turnProxyDialer(ctx context.Context, httpClient *http.Client, p
 		return websocket.NetConn(ctx, conn, websocket.MessageBinary), nil
 	})
 }
+
+// AgentStatsReportRequest is a WebSocket request by coderd
+// to the agent for stats.
+type AgentStatsReportRequest struct {
+}
+
+// AgentStatsReportResponse is returned for each report
+// request by the agent.
+type AgentStatsReportResponse struct {
+	Conns []agent.ConnStats `json:"conns,omitempty"`
+}

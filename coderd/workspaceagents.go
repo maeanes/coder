@@ -8,7 +8,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +19,7 @@ import (
 	"golang.org/x/xerrors"
 	"inet.af/netaddr"
 	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 	"tailscale.com/types/key"
 
 	"cdr.dev/slog"
@@ -150,6 +153,80 @@ func (api *API) workspaceAgentMetadata(rw http.ResponseWriter, r *http.Request) 
 		StartupScript:        apiAgent.StartupScript,
 		Directory:            apiAgent.Directory,
 	})
+}
+
+var inTest = strings.HasSuffix(os.Args[0], ".test")
+
+func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Request) {
+	api.websocketWaitMutex.Lock()
+	api.websocketWaitGroup.Add(1)
+	api.websocketWaitMutex.Unlock()
+	defer api.websocketWaitGroup.Done()
+
+	workspaceAgent := httpmw.WorkspaceAgent(r)
+	workspace, err := api.Database.GetWorkspaceResourceByID(r.Context(), workspaceAgent.ResourceID)
+	if err != nil {
+		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to accept websocket.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	conn, err := websocket.Accept(rw, r, &websocket.AcceptOptions{
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	if err != nil {
+		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to accept websocket.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	defer conn.Close(websocket.StatusAbnormalClosure, "")
+
+	var interval = time.Minute
+	if inTest {
+		interval = 100 * time.Millisecond
+	}
+
+	ctx := r.Context()
+	timer := time.NewTimer(interval)
+	for {
+		err := wsjson.Write(ctx, conn, codersdk.AgentStatsReportRequest{})
+		if err != nil {
+			httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+				Message: "Failed to write report request.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		var rep codersdk.AgentStatsReportResponse
+
+		err = wsjson.Read(ctx, conn, &rep)
+		if err != nil {
+			httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+				Message: "Failed to read report response.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+
+		api.Logger.Debug(ctx, "read stats report",
+			slog.F("agent", workspaceAgent.ID),
+			slog.F("workspace", workspace.ID),
+			slog.F("report", rep),
+		)
+
+		select {
+		case <-timer.C:
+			continue
+		case <-ctx.Done():
+			conn.Close(websocket.StatusNormalClosure, "")
+			return
+		}
+	}
+
 }
 
 func (api *API) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {

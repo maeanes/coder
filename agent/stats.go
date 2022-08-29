@@ -16,8 +16,7 @@ type ConnStats struct {
 	RxBytes uint64 `json:"rx_bytes,omitempty"`
 
 	// TxBytes must be read with atomic.
-	TxBytes uint64 `json:"tx_bytes,omitempty"`
-
+	TxBytes  uint64 `json:"tx_bytes,omitempty"`
 	net.Conn `json:"-"`
 }
 
