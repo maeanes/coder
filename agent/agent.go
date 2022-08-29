@@ -54,6 +54,7 @@ type Options struct {
 	EnableWireguard        bool
 	UploadWireguardKeys    UploadWireguardKeys
 	ListenWireguardPeers   ListenWireguardPeers
+	StatsReporter          StatsReporter
 	ReconnectingPTYTimeout time.Duration
 	EnvironmentVariables   map[string]string
 	Logger                 slog.Logger
@@ -93,6 +94,10 @@ func New(dialer Dialer, options *Options) io.Closer {
 		enableWireguard:        options.EnableWireguard,
 		postKeys:               options.UploadWireguardKeys,
 		listenWireguardPeers:   options.ListenWireguardPeers,
+		stats: &Stats{
+			ActiveConns: make(map[int64]*ConnStats),
+		},
+		statsReporter: options.StatsReporter,
 	}
 	server.init(ctx)
 	return server
@@ -120,6 +125,9 @@ type agent struct {
 	network              *peerwg.Network
 	postKeys             UploadWireguardKeys
 	listenWireguardPeers ListenWireguardPeers
+
+	stats         *Stats
+	statsReporter StatsReporter
 }
 
 func (a *agent) run(ctx context.Context) {
@@ -220,17 +228,17 @@ func (a *agent) runStartupScript(ctx context.Context, script string) error {
 	return nil
 }
 
-func (a *agent) handlePeerConn(ctx context.Context, conn *peer.Conn) {
+func (a *agent) handlePeerConn(ctx context.Context, peerConn *peer.Conn) {
 	go func() {
 		select {
 		case <-a.closed:
-		case <-conn.Closed():
+		case <-peerConn.Closed():
 		}
-		_ = conn.Close()
+		_ = peerConn.Close()
 		a.connCloseWait.Done()
 	}()
 	for {
-		channel, err := conn.Accept(ctx)
+		channel, err := peerConn.Accept(ctx)
 		if err != nil {
 			if errors.Is(err, peer.ErrClosed) || a.isClosed() {
 				return
@@ -239,19 +247,21 @@ func (a *agent) handlePeerConn(ctx context.Context, conn *peer.Conn) {
 			return
 		}
 
-		switch channel.Protocol() {
-		case ProtocolSSH:
-			go a.sshServer.HandleConn(channel.NetConn())
-		case ProtocolReconnectingPTY:
-			go a.handleReconnectingPTY(ctx, channel.Label(), channel.NetConn())
-		case ProtocolDial:
-			go a.handleDial(ctx, channel.Label(), channel.NetConn())
-		default:
-			a.logger.Warn(ctx, "unhandled protocol from channel",
-				slog.F("protocol", channel.Protocol()),
-				slog.F("label", channel.Label()),
-			)
-		}
+		a.stats.goConn(channel.NetConn(), channel.Protocol(), func(conn net.Conn) {
+			switch channel.Protocol() {
+			case ProtocolSSH:
+				a.sshServer.HandleConn(conn)
+			case ProtocolReconnectingPTY:
+				a.handleReconnectingPTY(ctx, channel.Label(), conn)
+			case ProtocolDial:
+				a.handleDial(ctx, channel.Label(), conn)
+			default:
+				a.logger.Warn(ctx, "unhandled protocol from channel",
+					slog.F("protocol", channel.Protocol()),
+					slog.F("label", channel.Label()),
+				)
+			}
+		})
 	}
 }
 
@@ -339,6 +349,25 @@ func (a *agent) init(ctx context.Context) {
 	}
 
 	go a.run(ctx)
+	if a.statsReporter != nil {
+		// If each report is approximately 100 bytes, and send a report every
+		// 60 seconds, we send 60*24*100 or 144kB a day per agent. If there
+		// are 100 agents with a retention policy of 30 days, we have 432MB
+		// of logs, which we consider acceptable.
+		go func() {
+			timer := time.NewTimer(time.Minute)
+			defer timer.Stop()
+
+			select {
+			case <-timer.C:
+				a.stats.RLock()
+				a.statsReporter(a.stats)
+				a.stats.RUnlock()
+			case <-ctx.Done():
+				return
+			}
+		}()
+	}
 }
 
 // createCommand processes raw command input with OpenSSH-like behavior.

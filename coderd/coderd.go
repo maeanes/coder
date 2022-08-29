@@ -130,6 +130,12 @@ func New(options *Options) *API {
 		httpmw.Recover(api.Logger),
 		httpmw.Logger(api.Logger),
 		httpmw.Prometheus(options.PrometheusRegistry),
+		// Build-Version is helpful for debugging.
+		func(h http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Add("Build-Version", buildinfo.Version())
+			})
+		},
 	)
 
 	apps := func(r chi.Router) {
