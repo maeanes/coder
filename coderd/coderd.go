@@ -131,9 +131,10 @@ func New(options *Options) *API {
 		httpmw.Logger(api.Logger),
 		httpmw.Prometheus(options.PrometheusRegistry),
 		// Build-Version is helpful for debugging.
-		func(h http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Add("Build-Version", buildinfo.Version())
+				next.ServeHTTP(w, r)
 			})
 		},
 	)
@@ -340,6 +341,8 @@ func New(options *Options) *API {
 				r.Use(httpmw.ExtractWorkspaceAgent(options.Database))
 				r.Get("/metadata", api.workspaceAgentMetadata)
 				r.Get("/listen", api.workspaceAgentListen)
+				r.Get("/report-stats", api.workspaceAgentReportStats)
+
 				r.Get("/gitsshkey", api.agentGitSSHKey)
 				r.Get("/turn", api.workspaceAgentTurn)
 				r.Get("/iceservers", api.workspaceAgentICEServers)

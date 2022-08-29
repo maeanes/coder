@@ -1,10 +1,15 @@
 package agent
 
 import (
+	"context"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/exp/maps"
+
+	"cdr.dev/slog"
 )
 
 // ConnStats wraps a net.Conn with statistics.
@@ -44,6 +49,15 @@ type Stats struct {
 	ActiveConns map[int64]*ConnStats `json:"active_conns,omitempty"`
 }
 
+func (s *Stats) Copy() *Stats {
+	s.RLock()
+	ss := &Stats{
+		ActiveConns: maps.Clone(s.ActiveConns),
+	}
+	s.RUnlock()
+	return ss
+}
+
 // goConn launches a new connection-processing goroutine, account for
 // s.Conns in a thread-safe manner.
 func (s *Stats) goConn(conn net.Conn, protocol string, fn func(conn net.Conn)) {
@@ -71,4 +85,4 @@ func (s *Stats) goConn(conn net.Conn, protocol string, fn func(conn net.Conn)) {
 }
 
 // StatsReporter periodically accept and records agent stats.
-type StatsReporter func(s *Stats)
+type StatsReporter func(ctx context.Context, log slog.Logger, stats func() *Stats) error

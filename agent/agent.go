@@ -350,23 +350,13 @@ func (a *agent) init(ctx context.Context) {
 
 	go a.run(ctx)
 	if a.statsReporter != nil {
-		// If each report is approximately 100 bytes, and send a report every
-		// 60 seconds, we send 60*24*100 or 144kB a day per agent. If there
-		// are 100 agents with a retention policy of 30 days, we have 432MB
-		// of logs, which we consider acceptable.
-		go func() {
-			timer := time.NewTimer(time.Minute)
-			defer timer.Stop()
-
-			select {
-			case <-timer.C:
-				a.stats.RLock()
-				a.statsReporter(a.stats)
-				a.stats.RUnlock()
-			case <-ctx.Done():
-				return
-			}
-		}()
+		err := a.statsReporter(ctx, a.logger, func() *Stats {
+			return a.stats.Copy()
+		})
+		if err != nil {
+			a.logger.Error(ctx, "report stats", slog.Error(err))
+			return
+		}
 	}
 }
 

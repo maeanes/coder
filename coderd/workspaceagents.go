@@ -226,7 +226,6 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-
 }
 
 func (api *API) workspaceAgentListen(rw http.ResponseWriter, r *http.Request) {

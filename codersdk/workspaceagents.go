@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"time"
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/net/proxy"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 
 	"cdr.dev/slog"
 
@@ -26,6 +28,7 @@ import (
 	"github.com/coder/coder/peerbroker"
 	"github.com/coder/coder/peerbroker/proto"
 	"github.com/coder/coder/provisionersdk"
+	"github.com/coder/retry"
 )
 
 type GoogleInstanceIdentityToken struct {
@@ -479,6 +482,73 @@ func (c *Client) turnProxyDialer(ctx context.Context, httpClient *http.Client, p
 		}
 		return websocket.NetConn(ctx, conn, websocket.MessageBinary), nil
 	})
+}
+
+// AgentReportStats begins a stat streaming connection with the Coder server.
+// It is resilient to network failures and intermittent coderd issues.
+func (c *Client) AgentReportStats(ctx context.Context, log slog.Logger, stats func() *agent.Stats) error {
+	serverURL, err := c.URL.Parse("/api/v2/workspaceagents/me/report-stats")
+	if err != nil {
+		return xerrors.Errorf("parse url: %w", err)
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return xerrors.Errorf("create cookie jar: %w", err)
+	}
+
+	jar.SetCookies(serverURL, []*http.Cookie{{
+		Name:  SessionTokenKey,
+		Value: c.SessionToken,
+	}})
+	httpClient := &http.Client{
+		Jar: jar,
+	}
+
+	go func() {
+		for r := retry.New(time.Second, time.Hour); r.Wait(ctx); {
+			err = func() error {
+				conn, res, err := websocket.Dial(ctx, serverURL.String(), &websocket.DialOptions{
+					HTTPClient: httpClient,
+					// Need to disable compression to avoid a data-race.
+					CompressionMode: websocket.CompressionDisabled,
+				})
+				if err != nil {
+					if res == nil {
+						return err
+					}
+					return readBodyAsError(res)
+				}
+
+				for {
+					var req AgentStatsReportRequest
+					err := wsjson.Read(ctx, conn, &req)
+					if err != nil {
+						return err
+					}
+
+					s := stats()
+					resp := AgentStatsReportResponse{
+						Conns: make([]agent.ConnStats, 0, len(s.ActiveConns)),
+					}
+
+					for _, cs := range s.ActiveConns {
+						resp.Conns = append(resp.Conns, *cs)
+					}
+
+					err = wsjson.Write(ctx, conn, resp)
+					if err != nil {
+						return err
+					}
+				}
+			}()
+			if err != nil {
+				log.Error(ctx, "report stats", slog.Error(err))
+			}
+		}
+	}()
+
+	return nil
 }
 
 // AgentStatsReportRequest is a WebSocket request by coderd
