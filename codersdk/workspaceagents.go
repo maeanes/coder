@@ -497,7 +497,7 @@ func (c *Client) AgentReportStats(
 	log slog.Logger,
 	stats func() *agent.Stats,
 ) (io.Closer, error) {
-	serverURL, err := c.URL.Parse("/api/v2/workspaceagents/me/report-stats")
+	serverURL, err := c.URL.Parse("/api/v2/metrics/report-agent-stats")
 	if err != nil {
 		return nil, xerrors.Errorf("parse url: %w", err)
 	}
