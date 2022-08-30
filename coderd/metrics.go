@@ -76,7 +76,7 @@ func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, resp)
 }
 
-const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
+const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL_MS"
 
 func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
@@ -177,6 +177,7 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 		var insert = !reflect.DeepEqual(lastReport, rep)
 
 		api.Logger.Debug(ctx, "read stats report",
+			slog.F("interval", interval),
 			slog.F("agent", workspaceAgent.ID),
 			slog.F("resource", resource.ID),
 			slog.F("workspace", workspace.ID),

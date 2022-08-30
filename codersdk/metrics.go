@@ -55,7 +55,11 @@ func (c *Client) AgentReportStats(
 	go func() {
 		defer close(doneCh)
 
-		for r := retry.New(time.Second, time.Hour); r.Wait(ctx); {
+		// If the agent connection succeeds for a while, then fails, then succeeds
+		// for a while (etc.) the retry may hit the maximum. This is a normal
+		// case for long-running agents that experience coderd upgrades, so
+		// we use a short maximum retry limit.
+		for r := retry.New(time.Second, time.Minute); r.Wait(ctx); {
 			err = func() error {
 				conn, res, err := websocket.Dial(ctx, serverURL.String(), &websocket.DialOptions{
 					HTTPClient: httpClient,
