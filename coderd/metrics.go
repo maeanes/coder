@@ -21,6 +21,36 @@ import (
 
 const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
 
+func FillEmptyDAUDays(rows []database.GetDAUsFromAgentStatsRow) []database.GetDAUsFromAgentStatsRow {
+	var newRows []database.GetDAUsFromAgentStatsRow
+
+	for i, row := range rows {
+		if i == 0 {
+			newRows = append(newRows, row)
+			continue
+		}
+
+		last := rows[i-1]
+
+		const day = time.Hour * 24
+		diff := row.Date.Sub(last.Date)
+		for diff > day {
+			if diff <= day {
+				break
+			}
+			last.Date = last.Date.Add(day)
+			last.Daus = 0
+			newRows = append(newRows, last)
+			diff -= day
+		}
+
+		newRows = append(newRows, row)
+		continue
+	}
+
+	return newRows
+}
+
 func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 	if !api.Authorize(r, rbac.ActionRead, rbac.ResourceMetrics) {
 		httpapi.Forbidden(rw)
@@ -37,7 +67,7 @@ func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp codersdk.GetDAUsResponse
-	for _, ent := range daus {
+	for _, ent := range FillEmptyDAUDays(daus) {
 		resp.Entries = append(resp.Entries, codersdk.DAUEntry{
 			Date: ent.Date,
 			DAUs: int(ent.Daus),
