@@ -63,6 +63,17 @@ func (s *Stats) Copy() *Stats {
 	return &ss
 }
 
+func (s *Stats) Reset() {
+	s.Lock()
+	defer s.Unlock()
+
+	for _, ps := range s.ProtocolStats {
+		atomic.StoreInt64(&ps.NumConns, 0)
+		atomic.StoreInt64(&ps.RxBytes, 0)
+		atomic.StoreInt64(&ps.TxBytes, 0)
+	}
+}
+
 // goConn launches a new connection-processing goroutine, account for
 // s.Conns in a thread-safe manner.
 func (s *Stats) goConn(conn net.Conn, protocol string, fn func(conn net.Conn)) {
@@ -79,17 +90,16 @@ func (s *Stats) goConn(conn net.Conn, protocol string, fn func(conn net.Conn)) {
 		Conn:          conn,
 	}
 
-	go func() {
-		atomic.AddInt64(&ps.NumConns, 1)
-		defer func() {
-			atomic.AddInt64(&ps.NumConns, -1)
-		}()
-
-		fn(cs)
-	}()
+	atomic.AddInt64(&ps.NumConns, 1)
+	go fn(cs)
 }
 
 // StatsReporter periodically accept and records agent stats.
+// The agent should send incremental stats instead of the cumulative
+// value so that SQL queries can efficiently detect activity rates and
+// short-lived connections.
+//
+// E.g., we want to easily query for periods where transfers exceeded 100MB.
 type StatsReporter func(
 	ctx context.Context,
 	log slog.Logger,

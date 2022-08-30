@@ -52,7 +52,7 @@ func FillEmptyDAUDays(rows []database.GetDAUsFromAgentStatsRow) []database.GetDA
 }
 
 func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
-	if !api.Authorize(r, rbac.ActionRead, rbac.ResourceMetrics) {
+	if !api.Authorize(r, rbac.ActionRead, rbac.ResourceUser) {
 		httpapi.Forbidden(rw)
 		return
 	}
