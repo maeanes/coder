@@ -29,6 +29,16 @@ export interface AgentGitSSHKey {
   readonly private_key: string
 }
 
+// From codersdk/workspaceagents.go
+export interface AgentStatsReportRequest {}
+
+// From codersdk/workspaceagents.go
+export interface AgentStatsReportResponse {
+  // Named type "github.com/coder/coder/agent.ConnStats" unknown, using "any"
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly conns?: any[]
+}
+
 // From codersdk/roles.go
 export interface AssignableRoles extends Role {
   readonly assignable: boolean

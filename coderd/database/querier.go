@@ -99,6 +99,7 @@ type querier interface {
 	GetWorkspaces(ctx context.Context, arg GetWorkspacesParams) ([]Workspace, error)
 	GetWorkspacesAutostart(ctx context.Context) ([]Workspace, error)
 	InsertAPIKey(ctx context.Context, arg InsertAPIKeyParams) (APIKey, error)
+	InsertAgentStat(ctx context.Context, arg InsertAgentStatParams) (AgentStat, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) (AuditLog, error)
 	InsertDeploymentID(ctx context.Context, value string) error
 	InsertFile(ctx context.Context, arg InsertFileParams) (File, error)
