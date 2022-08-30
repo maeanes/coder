@@ -1,5 +1,6 @@
 import { makeStyles } from "@material-ui/core/styles"
 import { ErrorSummary } from "components/ErrorSummary/ErrorSummary"
+import { WorkspaceQuota } from "components/WorkspaceQuota/WorkspaceQuota"
 import { WorkspaceStatusBadge } from "components/WorkspaceStatusBadge/WorkspaceStatusBadge"
 import { FC } from "react"
 import { useNavigate } from "react-router-dom"
@@ -120,6 +121,8 @@ export const Workspace: FC<React.PropsWithChildren<WorkspaceProps>> = ({
             handleClick={() => navigate(`/templates`)}
           />
 
+          <WorkspaceQuota loading={false} count={1} limit={3} />
+          <WorkspaceQuota loading count={1} limit={3} />
           <WorkspaceStats workspace={workspace} handleUpdate={handleUpdate} />
 
           {!!resources && !!resources.length && (
