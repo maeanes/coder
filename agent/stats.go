@@ -31,13 +31,13 @@ func (c *ConnStats) Write(b []byte) (n int, err error) {
 }
 
 type ProtocolStats struct {
-	NumConns int64 `json:"num_comms,omitempty"`
+	NumConns int64 `json:"num_comms"`
 
 	// RxBytes must be read with atomic.
-	RxBytes int64 `json:"rx_bytes,omitempty"`
+	RxBytes int64 `json:"rx_bytes"`
 
 	// TxBytes must be read with atomic.
-	TxBytes int64 `json:"tx_bytes,omitempty"`
+	TxBytes int64 `json:"tx_bytes"`
 }
 
 var _ net.Conn = new(ConnStats)

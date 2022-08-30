@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/coder/coder/coderd/database"
@@ -151,6 +152,39 @@ func (q *fakeQuerier) InsertAgentStat(_ context.Context, p database.InsertAgentS
 	}
 	q.agentStats = append(q.agentStats, stat)
 	return stat, nil
+}
+
+func (q *fakeQuerier) GetDAUsFromAgentStats(_ context.Context) ([]database.GetDAUsFromAgentStatsRow, error) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	counts := make(map[time.Time]map[string]struct{})
+
+	for _, as := range q.agentStats {
+		date := as.CreatedAt.Truncate(time.Hour * 24)
+		dateEntry := counts[date]
+		if dateEntry == nil {
+			dateEntry = make(map[string]struct{})
+		}
+		counts[date] = dateEntry
+
+		dateEntry[as.UserID.String()] = struct{}{}
+	}
+
+	countKeys := maps.Keys(counts)
+	sort.Slice(countKeys, func(i, j int) bool {
+		return countKeys[i].Before(countKeys[j])
+	})
+
+	var rs []database.GetDAUsFromAgentStatsRow
+	for _, key := range countKeys {
+		rs = append(rs, database.GetDAUsFromAgentStatsRow{
+			Date: key,
+			Daus: int64(len(counts[key])),
+		})
+	}
+
+	return rs, nil
 }
 
 func (q *fakeQuerier) ParameterValue(_ context.Context, id uuid.UUID) (database.ParameterValue, error) {

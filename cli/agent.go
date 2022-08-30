@@ -182,6 +182,7 @@ func workspaceAgent() *cobra.Command {
 				EnableWireguard:      wireguard,
 				UploadWireguardKeys:  client.UploadWorkspaceAgentKeys,
 				ListenWireguardPeers: client.WireguardPeerListener,
+				StatsReporter:        client.AgentReportStats,
 			})
 			<-cmd.Context().Done()
 			return closer.Close()

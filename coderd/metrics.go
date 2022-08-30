@@ -15,10 +15,37 @@ import (
 	"github.com/coder/coder/coderd/database"
 	"github.com/coder/coder/coderd/httpapi"
 	"github.com/coder/coder/coderd/httpmw"
+	"github.com/coder/coder/coderd/rbac"
 	"github.com/coder/coder/codersdk"
 )
 
-const AgentStatIntervalEnv = "AGENT_STAT_INTERVAL"
+const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
+
+func (api *API) getDAUs(rw http.ResponseWriter, r *http.Request) {
+	if !api.Authorize(r, rbac.ActionRead, rbac.ResourceMetrics) {
+		httpapi.Forbidden(rw)
+		return
+	}
+
+	daus, err := api.Database.GetDAUsFromAgentStats(r.Context())
+	if err != nil {
+		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to get DAUs.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	var resp codersdk.GetDAUsResponse
+	for _, ent := range daus {
+		resp.Entries = append(resp.Entries, codersdk.DAUEntry{
+			Date: ent.Date,
+			DAUs: int(ent.Daus),
+		})
+	}
+
+	json.NewEncoder(rw).Encode(resp)
+}
 
 func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
@@ -117,22 +144,26 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 			slog.F("agent", workspaceAgent.ID),
 			slog.F("resource", resource.ID),
 			slog.F("workspace", workspace.ID),
-			slog.F("conns", rep.ProtocolStats),
+			slog.F("payload", rep),
 		)
-		_, err = api.Database.InsertAgentStat(ctx, database.InsertAgentStatParams{
-			ID:          uuid.NewString(),
-			CreatedAt:   time.Now(),
-			AgentID:     workspaceAgent.ID,
-			WorkspaceID: build.WorkspaceID,
-			UserID:      workspace.OwnerID,
-			Payload:     json.RawMessage(repJSON),
-		})
-		if err != nil {
-			httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
-				Message: "Failed to insert agent stat.",
-				Detail:  err.Error(),
+
+		// Avoid inserting empty rows to preserve DB space.
+		if len(rep.ProtocolStats) > 0 {
+			_, err = api.Database.InsertAgentStat(ctx, database.InsertAgentStatParams{
+				ID:          uuid.NewString(),
+				CreatedAt:   time.Now(),
+				AgentID:     workspaceAgent.ID,
+				WorkspaceID: build.WorkspaceID,
+				UserID:      workspace.OwnerID,
+				Payload:     json.RawMessage(repJSON),
 			})
-			return
+			if err != nil {
+				httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+					Message: "Failed to insert agent stat.",
+					Detail:  err.Error(),
+				})
+				return
+			}
 		}
 
 		select {

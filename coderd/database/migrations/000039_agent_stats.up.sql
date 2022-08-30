@@ -1,5 +1,6 @@
 CREATE TABLE agent_stats (
 	id text NOT NULL,
+	PRIMARY KEY (id),
     created_at timestamptz NOT NULL,
     user_id uuid NOT NULL,
     agent_id uuid NOT NULL,

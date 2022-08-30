@@ -378,6 +378,9 @@ CREATE TABLE workspaces (
 
 ALTER TABLE ONLY licenses ALTER COLUMN id SET DEFAULT nextval('public.licenses_id_seq'::regclass);
 
+ALTER TABLE ONLY agent_stats
+    ADD CONSTRAINT agent_stats_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY api_keys
     ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
 

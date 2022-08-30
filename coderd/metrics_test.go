@@ -89,6 +89,19 @@ func TestWorkspaceReportStats(t *testing.T) {
 	_, err = session.Output("echo hello")
 	require.NoError(t, err)
 
+	// Give enough time for stats to hit DB
 	time.Sleep(time.Second * 1)
+
+	daus, err := client.GetDAUsFromAgentStats(context.Background())
 	require.NoError(t, err)
+
+	require.Equal(t, &codersdk.GetDAUsResponse{
+		Entries: []codersdk.DAUEntry{
+			{
+
+				Date: time.Now().UTC().Truncate(time.Hour * 24),
+				DAUs: 1,
+			},
+		},
+	}, daus)
 }

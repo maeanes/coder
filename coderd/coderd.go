@@ -338,6 +338,12 @@ func New(options *Options) *API {
 				r.Use(httpmw.ExtractWorkspaceAgent(options.Database))
 				r.Get("/report-agent-stats", api.workspaceAgentReportStats)
 			})
+			r.Group(func(r chi.Router) {
+				r.Use(
+					apiKeyMiddleware,
+				)
+				r.Get("/daus", api.getDAUs)
+			})
 		})
 		r.Route("/workspaceagents", func(r chi.Router) {
 			r.Post("/azure-instance-identity", api.postWorkspaceAuthAzureInstanceIdentity)

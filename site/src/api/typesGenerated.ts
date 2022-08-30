@@ -34,9 +34,10 @@ export interface AgentStatsReportRequest {}
 
 // From codersdk/workspaceagents.go
 export interface AgentStatsReportResponse {
-  // Named type "github.com/coder/coder/agent.ConnStats" unknown, using "any"
+  readonly num_comms: number
+  // Named type "github.com/coder/coder/agent.ProtocolStats" unknown, using "any"
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly conns?: any[]
+  readonly protocol_stats: Record<string, any>
 }
 
 // From codersdk/roles.go

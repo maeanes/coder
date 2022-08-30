@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"time"
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/google/uuid"
@@ -17,7 +16,6 @@ import (
 	"golang.org/x/net/proxy"
 	"golang.org/x/xerrors"
 	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 
 	"cdr.dev/slog"
 
@@ -28,7 +26,6 @@ import (
 	"github.com/coder/coder/peerbroker"
 	"github.com/coder/coder/peerbroker/proto"
 	"github.com/coder/coder/provisionersdk"
-	"github.com/coder/retry"
 )
 
 type GoogleInstanceIdentityToken struct {
@@ -482,97 +479,4 @@ func (c *Client) turnProxyDialer(ctx context.Context, httpClient *http.Client, p
 		}
 		return websocket.NetConn(ctx, conn, websocket.MessageBinary), nil
 	})
-}
-
-type CloseFunc func() error
-
-func (c CloseFunc) Close() error {
-	return c()
-}
-
-// AgentReportStats begins a stat streaming connection with the Coder server.
-// It is resilient to network failures and intermittent coderd issues.
-func (c *Client) AgentReportStats(
-	ctx context.Context,
-	log slog.Logger,
-	stats func() *agent.Stats,
-) (io.Closer, error) {
-	serverURL, err := c.URL.Parse("/api/v2/metrics/report-agent-stats")
-	if err != nil {
-		return nil, xerrors.Errorf("parse url: %w", err)
-	}
-
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, xerrors.Errorf("create cookie jar: %w", err)
-	}
-
-	jar.SetCookies(serverURL, []*http.Cookie{{
-		Name:  SessionTokenKey,
-		Value: c.SessionToken,
-	}})
-
-	httpClient := &http.Client{
-		Jar: jar,
-	}
-
-	doneCh := make(chan struct{})
-	ctx, cancel := context.WithCancel(ctx)
-
-	go func() {
-		defer close(doneCh)
-
-		for r := retry.New(time.Second, time.Hour); r.Wait(ctx); {
-			err = func() error {
-				conn, res, err := websocket.Dial(ctx, serverURL.String(), &websocket.DialOptions{
-					HTTPClient: httpClient,
-					// Need to disable compression to avoid a data-race.
-					CompressionMode: websocket.CompressionDisabled,
-				})
-				if err != nil {
-					if res == nil {
-						return err
-					}
-					return readBodyAsError(res)
-				}
-
-				for {
-					var req AgentStatsReportRequest
-					err := wsjson.Read(ctx, conn, &req)
-					if err != nil {
-						return err
-					}
-
-					resp := AgentStatsReportResponse{
-						ProtocolStats: stats().ProtocolStats,
-					}
-
-					err = wsjson.Write(ctx, conn, resp)
-					if err != nil {
-						return err
-					}
-				}
-			}()
-			if err != nil && ctx.Err() == nil {
-				log.Error(ctx, "report stats", slog.Error(err))
-			}
-		}
-	}()
-
-	return CloseFunc(func() error {
-		cancel()
-		<-doneCh
-		return nil
-	}), nil
-}
-
-// AgentStatsReportRequest is a WebSocket request by coderd
-// to the agent for stats.
-type AgentStatsReportRequest struct {
-}
-
-// AgentStatsReportResponse is returned for each report
-// request by the agent.
-type AgentStatsReportResponse struct {
-	ProtocolStats map[string]*agent.ProtocolStats `json:"conn_stats,omitempty"`
 }

@@ -16,6 +16,48 @@ import (
 	"github.com/tabbed/pqtype"
 )
 
+const getDAUsFromAgentStats = `-- name: GetDAUsFromAgentStats :many
+select
+	created_at::date as date,
+	count(distinct(user_id)) as daus
+from
+	agent_stats
+where
+	cast(payload->>'num_comms' as integer) > 0
+group by
+	date
+order by
+	date asc
+`
+
+type GetDAUsFromAgentStatsRow struct {
+	Date time.Time `db:"date" json:"date"`
+	Daus int64     `db:"daus" json:"daus"`
+}
+
+func (q *sqlQuerier) GetDAUsFromAgentStats(ctx context.Context) ([]GetDAUsFromAgentStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getDAUsFromAgentStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDAUsFromAgentStatsRow
+	for rows.Next() {
+		var i GetDAUsFromAgentStatsRow
+		if err := rows.Scan(&i.Date, &i.Daus); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertAgentStat = `-- name: InsertAgentStat :one
 INSERT INTO
 	agent_stats (
