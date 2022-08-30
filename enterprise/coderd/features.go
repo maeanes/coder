@@ -5,10 +5,12 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"golang.org/x/xerrors"
 
 	"cdr.dev/slog"
 
@@ -29,6 +31,13 @@ type featuresService struct {
 	keys           map[string]ed25519.PublicKey
 	enablements    Enablements
 	resyncInterval time.Duration
+	// enabledImplementations includes an "enabled" implementation of every feature.  This is
+	// initialized at start of day and remains static.  The consequence of this is that these things
+	// are hanging around using memory even if not licensed or in use, but it greatly simplifies the
+	// logic because we don't have to bother creating and destroying them as entitlements change.
+	// If we have a particularly memory-hungry feature in future, we might wish to reconsider this
+	// choice.
+	enabledImplementations agpl.FeatureInterfaces
 
 	mu           sync.RWMutex
 	entitlements entitlements
@@ -258,4 +267,49 @@ func max(a, b int64) int64 {
 		return a
 	}
 	return b
+}
+
+func (s *featuresService) Get(ps any) error {
+	if reflect.TypeOf(ps).Kind() != reflect.Pointer {
+		return xerrors.New("input must be pointer to struct")
+	}
+	vs := reflect.ValueOf(ps).Elem()
+	if vs.Kind() != reflect.Struct {
+		return xerrors.New("input must be pointer to struct")
+	}
+	// grab a local copy of entitlements so that we have a consistent set, but aren't keeping it
+	// locked from updates while we process.
+	s.mu.RLock()
+	ent := s.entitlements
+	s.mu.RUnlock()
+
+	for i := 0; i < vs.NumField(); i++ {
+		vf := vs.Field(i)
+		tf := vf.Type()
+		if tf.Kind() != reflect.Interface {
+			return xerrors.Errorf("fields of input struct must be interfaces: %s", tf.String())
+		}
+
+		err := s.setImplementation(ent, vf, tf)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *featuresService) setImplementation(ent entitlements, vf reflect.Value, tf reflect.Type) error {
+	switch tf {
+	case reflect.TypeOf(agpl.DisabledImplementations.Auditor):
+		// Audit logging
+		if !s.enablements.AuditLogs || ent.auditLogs.state == notEntitled {
+			vf.Set(reflect.ValueOf(agpl.DisabledImplementations.Auditor))
+			return nil
+		}
+		vf.Set(reflect.ValueOf(s.enabledImplementations.Auditor))
+		return nil
+	default:
+		return xerrors.Errorf("unable to find implementation of interface %s", tf.String())
+	}
+
 }

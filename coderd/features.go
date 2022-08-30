@@ -7,7 +7,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/coderd/audit"
-
 	"github.com/coder/coder/coderd/httpapi"
 	"github.com/coder/coder/codersdk"
 )
@@ -71,7 +70,7 @@ func setImplementation(vf reflect.Value, tf reflect.Type) error {
 	// when we get more than a few features it might make sense to have a data structure for finding
 	// the correct implementation that's faster than just a linear search, but for now just spin
 	// through the implementations we have.
-	vd := reflect.ValueOf(disabledImplementations)
+	vd := reflect.ValueOf(DisabledImplementations)
 	for j := 0; j < vd.NumField(); j++ {
 		vdf := vd.Field(j)
 		if vdf.Type() == tf {
@@ -82,13 +81,13 @@ func setImplementation(vf reflect.Value, tf reflect.Type) error {
 	return xerrors.Errorf("unable to find implementation of interface %s", tf.String())
 }
 
-// featureInterfaces contains a field for each interface controlled by an enterprise feature.
-type featureInterfaces struct {
-	auditor audit.Auditor
+// FeatureInterfaces contains a field for each interface controlled by an enterprise feature.
+type FeatureInterfaces struct {
+	Auditor audit.Auditor
 }
 
-// disabled implementations includes all the implementations of turned-off features.  There are no
+// DisabledImplementations includes all the implementations of turned-off features.  There are no
 // turned-on implementations in AGPL code.
-var disabledImplementations = featureInterfaces{
-	auditor: audit.NewNop(),
+var DisabledImplementations = FeatureInterfaces{
+	Auditor: audit.NewNop(),
 }
