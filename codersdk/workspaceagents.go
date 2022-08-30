@@ -484,28 +484,44 @@ func (c *Client) turnProxyDialer(ctx context.Context, httpClient *http.Client, p
 	})
 }
 
+type CloseFunc func() error
+
+func (c CloseFunc) Close() error {
+	return c()
+}
+
 // AgentReportStats begins a stat streaming connection with the Coder server.
 // It is resilient to network failures and intermittent coderd issues.
-func (c *Client) AgentReportStats(ctx context.Context, log slog.Logger, stats func() *agent.Stats) error {
+func (c *Client) AgentReportStats(
+	ctx context.Context,
+	log slog.Logger,
+	stats func() *agent.Stats,
+) (io.Closer, error) {
 	serverURL, err := c.URL.Parse("/api/v2/workspaceagents/me/report-stats")
 	if err != nil {
-		return xerrors.Errorf("parse url: %w", err)
+		return nil, xerrors.Errorf("parse url: %w", err)
 	}
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return xerrors.Errorf("create cookie jar: %w", err)
+		return nil, xerrors.Errorf("create cookie jar: %w", err)
 	}
 
 	jar.SetCookies(serverURL, []*http.Cookie{{
 		Name:  SessionTokenKey,
 		Value: c.SessionToken,
 	}})
+
 	httpClient := &http.Client{
 		Jar: jar,
 	}
 
+	doneCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(ctx)
+
 	go func() {
+		defer close(doneCh)
+
 		for r := retry.New(time.Second, time.Hour); r.Wait(ctx); {
 			err = func() error {
 				conn, res, err := websocket.Dial(ctx, serverURL.String(), &websocket.DialOptions{
@@ -527,13 +543,8 @@ func (c *Client) AgentReportStats(ctx context.Context, log slog.Logger, stats fu
 						return err
 					}
 
-					s := stats()
 					resp := AgentStatsReportResponse{
-						Conns: make([]agent.ConnStats, 0, len(s.ActiveConns)),
-					}
-
-					for _, cs := range s.ActiveConns {
-						resp.Conns = append(resp.Conns, *cs)
+						ProtocolStats: stats().ProtocolStats,
 					}
 
 					err = wsjson.Write(ctx, conn, resp)
@@ -542,13 +553,17 @@ func (c *Client) AgentReportStats(ctx context.Context, log slog.Logger, stats fu
 					}
 				}
 			}()
-			if err != nil {
+			if err != nil && ctx.Err() == nil {
 				log.Error(ctx, "report stats", slog.Error(err))
 			}
 		}
 	}()
 
-	return nil
+	return CloseFunc(func() error {
+		cancel()
+		<-doneCh
+		return nil
+	}), nil
 }
 
 // AgentStatsReportRequest is a WebSocket request by coderd
@@ -559,5 +574,5 @@ type AgentStatsReportRequest struct {
 // AgentStatsReportResponse is returned for each report
 // request by the agent.
 type AgentStatsReportResponse struct {
-	Conns []agent.ConnStats `json:"conns,omitempty"`
+	ProtocolStats map[string]*agent.ProtocolStats `json:"conn_stats,omitempty"`
 }

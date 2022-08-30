@@ -137,7 +137,7 @@ func TestWorkspaceReportStats(t *testing.T) {
 	_, err = session.Output("echo hello")
 	require.NoError(t, err)
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
 }
 

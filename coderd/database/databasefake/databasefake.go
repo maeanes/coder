@@ -23,6 +23,7 @@ func New() database.Store {
 		mutex: &sync.RWMutex{},
 		data: &data{
 			apiKeys:             make([]database.APIKey, 0),
+			agentStats:          make([]database.AgentStat, 0),
 			organizationMembers: make([]database.OrganizationMember, 0),
 			organizations:       make([]database.Organization, 0),
 			users:               make([]database.User, 0),
@@ -78,6 +79,7 @@ type data struct {
 	userLinks           []database.UserLink
 
 	// New tables
+	agentStats                     []database.AgentStat
 	auditLogs                      []database.AuditLog
 	files                          []database.File
 	gitSSHKey                      []database.GitSSHKey
@@ -133,6 +135,22 @@ func (q *fakeQuerier) AcquireProvisionerJob(_ context.Context, arg database.Acqu
 		return provisionerJob, nil
 	}
 	return database.ProvisionerJob{}, sql.ErrNoRows
+}
+
+func (q *fakeQuerier) InsertAgentStat(_ context.Context, p database.InsertAgentStatParams) (database.AgentStat, error) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	stat := database.AgentStat{
+		ID:          p.ID,
+		CreatedAt:   p.CreatedAt,
+		WorkspaceID: p.WorkspaceID,
+		AgentID:     p.AgentID,
+		UserID:      p.UserID,
+		Payload:     p.Payload,
+	}
+	q.agentStats = append(q.agentStats, stat)
+	return stat, nil
 }
 
 func (q *fakeQuerier) ParameterValue(_ context.Context, id uuid.UUID) (database.ParameterValue, error) {

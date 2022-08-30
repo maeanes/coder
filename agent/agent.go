@@ -95,7 +95,7 @@ func New(dialer Dialer, options *Options) io.Closer {
 		postKeys:               options.UploadWireguardKeys,
 		listenWireguardPeers:   options.ListenWireguardPeers,
 		stats: &Stats{
-			ActiveConns: make(map[int64]*ConnStats),
+			ProtocolStats: make(map[string]*ProtocolStats),
 		},
 		statsReporter: options.StatsReporter,
 	}
@@ -350,13 +350,19 @@ func (a *agent) init(ctx context.Context) {
 
 	go a.run(ctx)
 	if a.statsReporter != nil {
-		err := a.statsReporter(ctx, a.logger, func() *Stats {
+		cl, err := a.statsReporter(ctx, a.logger, func() *Stats {
 			return a.stats.Copy()
 		})
 		if err != nil {
 			a.logger.Error(ctx, "report stats", slog.Error(err))
 			return
 		}
+		a.connCloseWait.Add(1)
+		go func() {
+			defer a.connCloseWait.Done()
+			<-a.closed
+			cl.Close()
+		}()
 	}
 }
 

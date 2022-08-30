@@ -164,10 +164,28 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 	defer api.websocketWaitGroup.Done()
 
 	workspaceAgent := httpmw.WorkspaceAgent(r)
-	workspace, err := api.Database.GetWorkspaceResourceByID(r.Context(), workspaceAgent.ResourceID)
+	resource, err := api.Database.GetWorkspaceResourceByID(r.Context(), workspaceAgent.ResourceID)
 	if err != nil {
 		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
-			Message: "Failed to accept websocket.",
+			Message: "Failed to get workspace resource.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	build, err := api.Database.GetWorkspaceBuildByJobID(r.Context(), resource.JobID)
+	if err != nil {
+		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to get build.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	workspace, err := api.Database.GetWorkspaceByID(r.Context(), build.WorkspaceID)
+	if err != nil {
+		httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to get workspace.",
 			Detail:  err.Error(),
 		})
 		return
@@ -191,7 +209,7 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 	}
 
 	ctx := r.Context()
-	timer := time.NewTimer(interval)
+	timer := time.NewTicker(interval)
 	for {
 		err := wsjson.Write(ctx, conn, codersdk.AgentStatsReportRequest{})
 		if err != nil {
@@ -212,11 +230,36 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		repJSON, err := json.Marshal(rep)
+		if err != nil {
+			httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+				Message: "Failed to marshal stat json.",
+				Detail:  err.Error(),
+			})
+			return
+		}
+
 		api.Logger.Debug(ctx, "read stats report",
 			slog.F("agent", workspaceAgent.ID),
+			slog.F("resource", resource.ID),
 			slog.F("workspace", workspace.ID),
-			slog.F("report", rep),
+			slog.F("conns", rep.ProtocolStats),
 		)
+		_, err = api.Database.InsertAgentStat(ctx, database.InsertAgentStatParams{
+			ID:          uuid.NewString(),
+			CreatedAt:   time.Now(),
+			AgentID:     workspaceAgent.ID,
+			WorkspaceID: build.WorkspaceID,
+			UserID:      workspace.OwnerID,
+			Payload:     json.RawMessage(repJSON),
+		})
+		if err != nil {
+			httpapi.Write(rw, http.StatusBadRequest, codersdk.Response{
+				Message: "Failed to insert agent stat.",
+				Detail:  err.Error(),
+			})
+			return
+		}
 
 		select {
 		case <-timer.C:
