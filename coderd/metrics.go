@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -18,8 +19,6 @@ import (
 	"github.com/coder/coder/coderd/rbac"
 	"github.com/coder/coder/codersdk"
 )
-
-const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
 
 func FillEmptyDAUDays(rows []database.GetDAUsFromAgentStatsRow) []database.GetDAUsFromAgentStatsRow {
 	var newRows []database.GetDAUsFromAgentStatsRow
@@ -77,6 +76,8 @@ func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 	httpapi.Write(rw, http.StatusOK, resp)
 }
 
+const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
+
 func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Request) {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Add(1)
@@ -123,6 +124,7 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 	}
 	defer conn.Close(websocket.StatusAbnormalClosure, "")
 
+	// The complexity of the DAU query is inversely proportional to this interval.
 	var interval = time.Minute
 
 	// Allow overriding the stat interval for debugging and testing purposes.
@@ -141,6 +143,7 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 	timer := time.NewTicker(interval)
+	var lastReport codersdk.AgentStatsReportResponse
 	for {
 		err := wsjson.Write(ctx, conn, codersdk.AgentStatsReportRequest{})
 		if err != nil {
@@ -170,15 +173,20 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		// Avoid inserting duplicate rows to preserve DB space.
+		var insert = !reflect.DeepEqual(lastReport, rep)
+
 		api.Logger.Debug(ctx, "read stats report",
 			slog.F("agent", workspaceAgent.ID),
 			slog.F("resource", resource.ID),
 			slog.F("workspace", workspace.ID),
+			slog.F("insert", insert),
 			slog.F("payload", rep),
 		)
 
-		// Avoid inserting empty rows to preserve DB space.
-		if len(rep.ProtocolStats) > 0 {
+		if insert {
+			lastReport = rep
+
 			_, err = api.Database.InsertAgentStat(ctx, database.InsertAgentStatParams{
 				ID:          uuid.NewString(),
 				CreatedAt:   time.Now(),

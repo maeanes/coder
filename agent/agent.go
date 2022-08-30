@@ -351,9 +351,7 @@ func (a *agent) init(ctx context.Context) {
 	go a.run(ctx)
 	if a.statsReporter != nil {
 		cl, err := a.statsReporter(ctx, a.logger, func() *Stats {
-			ss := a.stats.Copy()
-			a.stats.Reset()
-			return ss
+			return a.stats.Copy()
 		})
 		if err != nil {
 			a.logger.Error(ctx, "report stats", slog.Error(err))
