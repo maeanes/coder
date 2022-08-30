@@ -44,7 +44,7 @@ func (api *API) getDAUs(rw http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	json.NewEncoder(rw).Encode(resp)
+	httpapi.Write(rw, http.StatusOK, resp)
 }
 
 func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Request) {

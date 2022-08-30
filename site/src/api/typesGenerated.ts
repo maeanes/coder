@@ -29,10 +29,10 @@ export interface AgentGitSSHKey {
   readonly private_key: string
 }
 
-// From codersdk/workspaceagents.go
+// From codersdk/metrics.go
 export interface AgentStatsReportRequest {}
 
-// From codersdk/workspaceagents.go
+// From codersdk/metrics.go
 export interface AgentStatsReportResponse {
   readonly num_comms: number
   // Named type "github.com/coder/coder/agent.ProtocolStats" unknown, using "any"
@@ -151,6 +151,12 @@ export interface CreateWorkspaceRequest {
   readonly parameter_values?: CreateParameterRequest[]
 }
 
+// From codersdk/metrics.go
+export interface DAUEntry {
+  readonly date: string
+  readonly daus: number
+}
+
 // From codersdk/features.go
 export interface Entitlements {
   readonly features: Record<string, Feature>
@@ -169,6 +175,11 @@ export interface Feature {
 // From codersdk/users.go
 export interface GenerateAPIKeyResponse {
   readonly key: string
+}
+
+// From codersdk/metrics.go
+export interface GetDAUsResponse {
+  readonly entries: DAUEntry[]
 }
 
 // From codersdk/gitsshkey.go
