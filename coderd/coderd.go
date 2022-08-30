@@ -342,7 +342,7 @@ func New(options *Options) *API {
 				r.Use(
 					apiKeyMiddleware,
 				)
-				r.Get("/daus", api.getDAUs)
+				r.Get("/daus", api.daus)
 			})
 		})
 		r.Route("/workspaceagents", func(r chi.Router) {

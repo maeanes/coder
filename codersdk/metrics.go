@@ -130,6 +130,8 @@ func (c *Client) GetDAUsFromAgentStats(ctx context.Context) (*GetDAUsResponse, e
 	return &resp, json.NewDecoder(res.Body).Decode(&resp)
 }
 
+// @typescript-ignore AgentStatsReportRequest
+
 // AgentStatsReportRequest is a WebSocket request by coderd
 // to the agent for stats.
 type AgentStatsReportRequest struct {

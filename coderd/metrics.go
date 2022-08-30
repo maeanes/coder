@@ -21,7 +21,7 @@ import (
 
 const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL"
 
-func (api *API) getDAUs(rw http.ResponseWriter, r *http.Request) {
+func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 	if !api.Authorize(r, rbac.ActionRead, rbac.ResourceMetrics) {
 		httpapi.Forbidden(rw)
 		return

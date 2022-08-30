@@ -30,9 +30,6 @@ export interface AgentGitSSHKey {
 }
 
 // From codersdk/metrics.go
-export interface AgentStatsReportRequest {}
-
-// From codersdk/metrics.go
 export interface AgentStatsReportResponse {
   readonly num_comms: number
   // Named type "github.com/coder/coder/agent.ProtocolStats" unknown, using "any"
