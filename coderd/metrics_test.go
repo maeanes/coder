@@ -3,7 +3,6 @@ package coderd_test
 import (
 	"context"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/coder/coder/agent"
 	"github.com/coder/coder/coderd"
 	"github.com/coder/coder/coderd/coderdtest"
-	"github.com/coder/coder/coderd/database"
+	"github.com/coder/coder/coderd/metricscache"
 	"github.com/coder/coder/codersdk"
 	"github.com/coder/coder/peer"
 	"github.com/coder/coder/provisioner/echo"
@@ -24,6 +23,7 @@ import (
 
 func init() {
 	os.Setenv(coderd.AgentStatIntervalEnv, "100")
+	os.Setenv(metricscache.CacheRefreshIntervalEnv, "100")
 }
 func TestWorkspaceReportStats(t *testing.T) {
 	t.Parallel()
@@ -92,7 +92,8 @@ func TestWorkspaceReportStats(t *testing.T) {
 	require.NoError(t, err)
 
 	// Give enough time for stats to hit DB
-	time.Sleep(time.Second * 1)
+	// and metrics cache to refresh.
+	time.Sleep(time.Second * 5)
 
 	daus, err := client.GetDAUsFromAgentStats(context.Background())
 	require.NoError(t, err)
@@ -106,107 +107,4 @@ func TestWorkspaceReportStats(t *testing.T) {
 			},
 		},
 	}, daus)
-}
-
-func date(year, month, day int) time.Time {
-	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-}
-
-func TestFillEmptyDAUDays(t *testing.T) {
-	t.Parallel()
-
-	type args struct {
-		rows []database.GetDAUsFromAgentStatsRow
-	}
-	tests := []struct {
-		name string
-		args args
-		want []database.GetDAUsFromAgentStatsRow
-	}{
-		{"empty", args{}, nil},
-		{"no holes", args{
-			rows: []database.GetDAUsFromAgentStatsRow{
-				{
-					Date: date(2022, 01, 01),
-					Daus: 1,
-				},
-				{
-					Date: date(2022, 01, 02),
-					Daus: 1,
-				},
-				{
-					Date: date(2022, 01, 03),
-					Daus: 1,
-				},
-			},
-		}, []database.GetDAUsFromAgentStatsRow{
-			{
-				Date: date(2022, 01, 01),
-				Daus: 1,
-			},
-			{
-				Date: date(2022, 01, 02),
-				Daus: 1,
-			},
-			{
-				Date: date(2022, 01, 03),
-				Daus: 1,
-			},
-		}},
-		{"holes", args{
-			rows: []database.GetDAUsFromAgentStatsRow{
-				{
-					Date: date(2022, 1, 1),
-					Daus: 3,
-				},
-				{
-					Date: date(2022, 1, 4),
-					Daus: 1,
-				},
-				{
-					Date: date(2022, 1, 7),
-					Daus: 3,
-				},
-			},
-		}, []database.GetDAUsFromAgentStatsRow{
-			{
-				Date: date(2022, 1, 1),
-				Daus: 3,
-			},
-			{
-				Date: date(2022, 1, 2),
-				Daus: 0,
-			},
-			{
-				Date: date(2022, 1, 3),
-				Daus: 0,
-			},
-			{
-				Date: date(2022, 1, 4),
-				Daus: 1,
-			},
-			{
-				Date: date(2022, 1, 5),
-				Daus: 0,
-			},
-			{
-				Date: date(2022, 1, 6),
-				Daus: 0,
-			},
-			{
-				Date: date(2022, 1, 7),
-				Daus: 3,
-			},
-		}},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := coderd.FillEmptyDAUDays(tt.args.rows); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fillEmptyDAUDays() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }

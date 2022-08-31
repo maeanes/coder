@@ -1,6 +1,7 @@
 package coderd
 
 import (
+	"context"
 	"crypto/x509"
 	"io"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"github.com/coder/coder/coderd/gitsshkey"
 	"github.com/coder/coder/coderd/httpapi"
 	"github.com/coder/coder/coderd/httpmw"
+	"github.com/coder/coder/coderd/metricscache"
 	"github.com/coder/coder/coderd/rbac"
 	"github.com/coder/coder/coderd/telemetry"
 	"github.com/coder/coder/coderd/tracing"
@@ -109,6 +111,13 @@ func New(options *Options) *API {
 		panic(xerrors.Errorf("read site bin failed: %w", err))
 	}
 
+	metricsCache := metricscache.New(
+		options.Database,
+		options.Logger.Named("metrics_cache"),
+	)
+
+	metricsCache.Start(context.Background())
+
 	r := chi.NewRouter()
 	api := &API{
 		Options:     options,
@@ -118,6 +127,7 @@ func New(options *Options) *API {
 			Authorizer: options.Authorizer,
 			Logger:     options.Logger,
 		},
+		metricsCache: metricsCache,
 	}
 	api.workspaceAgentCache = wsconncache.New(api.dialWorkspaceAgent, 0)
 	oauthConfigs := &httpmw.OAuth2Configs{
@@ -445,6 +455,8 @@ type API struct {
 	websocketWaitGroup  sync.WaitGroup
 	workspaceAgentCache *wsconncache.Cache
 	httpAuth            *HTTPAuthorizer
+
+	metricsCache *metricscache.Cache
 }
 
 // Close waits for all WebSocket connections to drain before returning.
@@ -452,6 +464,8 @@ func (api *API) Close() error {
 	api.websocketWaitMutex.Lock()
 	api.websocketWaitGroup.Wait()
 	api.websocketWaitMutex.Unlock()
+
+	api.metricsCache.Close()
 
 	return api.workspaceAgentCache.Close()
 }
