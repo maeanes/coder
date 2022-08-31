@@ -189,7 +189,7 @@ func (api *API) workspaceAgentReportStats(rw http.ResponseWriter, r *http.Reques
 			lastReport = rep
 
 			_, err = api.Database.InsertAgentStat(ctx, database.InsertAgentStatParams{
-				ID:          uuid.NewString(),
+				ID:          uuid.New(),
 				CreatedAt:   time.Now(),
 				AgentID:     workspaceAgent.ID,
 				WorkspaceID: build.WorkspaceID,

@@ -10,10 +10,14 @@ export interface DAUChartProps {
   userMetricsData: TypesGen.GetDAUsResponse
 }
 
+import useTheme from "@material-ui/styles/useTheme"
+
+import { Theme } from "@material-ui/core/styles"
 import {
   CategoryScale,
   Chart as ChartJS,
   ChartOptions,
+  defaults,
   Legend,
   LinearScale,
   LineElement,
@@ -21,10 +25,14 @@ import {
   Title,
   Tooltip,
 } from "chart.js"
+import { Stack } from "components/Stack/Stack"
+import { HelpTooltip, HelpTooltipText, HelpTooltipTitle } from "components/Tooltips/HelpTooltip"
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 export const DAUChart: FC<DAUChartProps> = ({ userMetricsData }) => {
+  const theme: Theme = useTheme()
+
   const labels = userMetricsData.entries.map((val) => {
     return moment(val.date).format("l")
   })
@@ -32,6 +40,8 @@ export const DAUChart: FC<DAUChartProps> = ({ userMetricsData }) => {
   const data = userMetricsData.entries.map((val) => {
     return val.daus
   })
+
+  defaults.font.family = theme.typography.fontFamily
 
   const options = {
     responsive: true,
@@ -43,25 +53,42 @@ export const DAUChart: FC<DAUChartProps> = ({ userMetricsData }) => {
     scales: {
       y: {
         min: 0,
+        ticks: {
+          precision: 0,
+        },
       },
-      x: {},
+      x: {
+        ticks: {},
+      },
     },
     aspectRatio: 6 / 1,
   } as ChartOptions
 
   return (
     <>
-      {/* <p>{JSON.stringify(chartData)}</p> */}
-
-      <WorkspaceSection title="Daily Active Users">
+      {/* <WorkspaceSection title="Daily Active Users"> */}
+      <WorkspaceSection>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <h3>Daily Active Users</h3>
+          <HelpTooltip size="small">
+            <HelpTooltipTitle>How do we calculate DAUs?</HelpTooltipTitle>
+            <HelpTooltipText>
+              We use daily, unique workspace connection traffic to compute DAUs.
+            </HelpTooltipText>
+          </HelpTooltip>
+        </Stack>
         <Line
           data={{
             labels: labels,
             datasets: [
               {
+                label: "Daily Active Users",
                 data: data,
+                lineTension: 1 / 4,
+                backgroundColor: theme.palette.secondary.dark,
+                borderColor: theme.palette.secondary.dark,
               },
-            ],
+            ] as any,
           }}
           options={options as any}
           height={400}

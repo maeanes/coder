@@ -88,7 +88,7 @@ CREATE TYPE workspace_transition AS ENUM (
 );
 
 CREATE TABLE agent_stats (
-    id text NOT NULL,
+    id uuid NOT NULL,
     created_at timestamp with time zone NOT NULL,
     user_id uuid NOT NULL,
     agent_id uuid NOT NULL,
