@@ -24,6 +24,35 @@ func Test_fillEmptyDAUDays(t *testing.T) {
 		want []database.GetDAUsFromAgentStatsRow
 	}{
 		{"empty", args{}, nil},
+		{"one hole", args{
+			rows: []database.GetDAUsFromAgentStatsRow{
+				{
+					Date: date(2022, 8, 27),
+					Daus: 1,
+				},
+				{
+					Date: date(2022, 8, 30),
+					Daus: 1,
+				},
+			},
+		}, []database.GetDAUsFromAgentStatsRow{
+			{
+				Date: date(2022, 8, 27),
+				Daus: 1,
+			},
+			{
+				Date: date(2022, 8, 28),
+				Daus: 0,
+			},
+			{
+				Date: date(2022, 8, 29),
+				Daus: 0,
+			},
+			{
+				Date: date(2022, 8, 30),
+				Daus: 1,
+			},
+		}},
 		{"no holes", args{
 			rows: []database.GetDAUsFromAgentStatsRow{
 				{

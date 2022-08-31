@@ -13,12 +13,10 @@ VALUES
 
 -- name: GetDAUsFromAgentStats :many
 select
-	created_at::date as date,
+	(created_at at TIME ZONE 'UTC')::date as date,
 	count(distinct(user_id)) as daus
 from
 	agent_stats
-where
-	cast(payload->>'num_comms' as integer) > 0
 group by
 	date
 order by

@@ -22,8 +22,10 @@ type Cache struct {
 
 	getDAUsResponse atomic.Pointer[codersdk.GetDAUsResponse]
 
-	wg     sync.WaitGroup
-	doneCh chan struct{}
+	wg sync.WaitGroup
+
+	closeOnce sync.Once
+	doneCh    chan struct{}
 }
 
 func New(db database.Store, log slog.Logger) *Cache {
@@ -141,7 +143,9 @@ func (c *Cache) Start(
 }
 
 func (c *Cache) Close() error {
-	close(c.doneCh)
+	c.closeOnce.Do(func() {
+		close(c.doneCh)
+	})
 	c.wg.Wait()
 	return nil
 }
