@@ -137,6 +137,10 @@ func (q *fakeQuerier) AcquireProvisionerJob(_ context.Context, arg database.Acqu
 	}
 	return database.ProvisionerJob{}, sql.ErrNoRows
 }
+func (q *fakeQuerier) DeleteOldAgentStats(_ context.Context) error {
+	// no-op
+	return nil
+}
 
 func (q *fakeQuerier) InsertAgentStat(_ context.Context, p database.InsertAgentStatParams) (database.AgentStat, error) {
 	q.mutex.Lock()

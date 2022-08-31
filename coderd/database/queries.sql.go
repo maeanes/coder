@@ -16,6 +16,15 @@ import (
 	"github.com/tabbed/pqtype"
 )
 
+const deleteOldAgentStats = `-- name: DeleteOldAgentStats :exec
+DELETE FROM AGENT_STATS WHERE created_at  < now() - interval '30 days'
+`
+
+func (q *sqlQuerier) DeleteOldAgentStats(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteOldAgentStats)
+	return err
+}
+
 const getDAUsFromAgentStats = `-- name: GetDAUsFromAgentStats :many
 select
 	created_at::date as date,

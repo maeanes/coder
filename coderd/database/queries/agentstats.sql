@@ -23,3 +23,6 @@ group by
 	date
 order by
 	date asc;
+
+-- name: DeleteOldAgentStats :exec
+DELETE FROM AGENT_STATS WHERE created_at  < now() - interval '30 days';

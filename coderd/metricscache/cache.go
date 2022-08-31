@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"cdr.dev/slog"
 	"github.com/coder/coder/coderd/database"
 	"github.com/coder/coder/codersdk"
@@ -65,6 +67,11 @@ func fillEmptyDAUDays(rows []database.GetDAUsFromAgentStatsRow) []database.GetDA
 }
 
 func (c *Cache) refresh(ctx context.Context) error {
+	err := c.Database.DeleteOldAgentStats(ctx)
+	if err != nil {
+		return xerrors.Errorf("delete old stats: %w", err)
+	}
+
 	daus, err := c.Database.GetDAUsFromAgentStats(ctx)
 	if err != nil {
 		return err
