@@ -27,6 +27,7 @@ func init() {
 }
 func TestWorkspaceReportStats(t *testing.T) {
 	t.Parallel()
+
 	client := coderdtest.New(t, &coderdtest.Options{
 		IncludeProvisionerD: true,
 	})
@@ -76,6 +77,13 @@ func TestWorkspaceReportStats(t *testing.T) {
 		Logger: slogtest.Make(t, nil).Named("client"),
 	}
 
+	daus, err := client.GetDAUsFromAgentStats(context.Background())
+	require.NoError(t, err)
+
+	require.Equal(t, &codersdk.GetDAUsResponse{
+		Entries: []codersdk.DAUEntry{},
+	}, daus, "no DAUs when stats are empty")
+
 	conn, err := client.DialWorkspaceAgent(ctx, resources[0].Agents[0].ID, opts)
 	require.NoError(t, err)
 	defer func() {
@@ -95,7 +103,7 @@ func TestWorkspaceReportStats(t *testing.T) {
 	// and metrics cache to refresh.
 	time.Sleep(time.Second * 5)
 
-	daus, err := client.GetDAUsFromAgentStats(context.Background())
+	daus, err = client.GetDAUsFromAgentStats(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, &codersdk.GetDAUsResponse{

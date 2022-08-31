@@ -31,6 +31,9 @@ import { HelpTooltip, HelpTooltipText, HelpTooltipTitle } from "components/Toolt
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 export const DAUChart: FC<DAUChartProps> = ({ userMetricsData }) => {
+  if (userMetricsData.entries.length === 0) {
+    return <p>DAU stats are loading. Check back later.</p>
+  }
   const theme: Theme = useTheme()
 
   const labels = userMetricsData.entries.map((val) => {

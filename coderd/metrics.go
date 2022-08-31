@@ -25,8 +25,11 @@ func (api *API) daus(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Forbidden(rw)
 		return
 	}
-
-	httpapi.Write(rw, http.StatusOK, api.metricsCache.GetDAUs())
+	resp := api.metricsCache.GetDAUs()
+	if resp.Entries == nil {
+		resp.Entries = []codersdk.DAUEntry{}
+	}
+	httpapi.Write(rw, http.StatusOK, resp)
 }
 
 const AgentStatIntervalEnv = "CODER_AGENT_STAT_INTERVAL_MS"
